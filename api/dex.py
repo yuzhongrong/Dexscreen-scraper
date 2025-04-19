@@ -4,18 +4,15 @@ import os
 from curl_cffi.requests import AsyncSession
 import json
 import nest_asyncio
-from datetime import datetime
-import time
-import struct
-from decimal import Decimal, ROUND_DOWN
 import re
 import requests
+import telebot  # 使用 pyTelegramBotAPI
 
 # Apply nest_asyncio
 nest_asyncio.apply()
 
-Api = os.environ["API"]  
-ID = "Channel ID"
+Api = os.environ.get("API")  # Telegram Bot Token
+ID = os.environ.get("CHANNEL_ID")  # Telegram Channel ID
 
 class DexBot():
     def __init__(self, api_key, url, channel_id=ID, max_token=10):
@@ -23,7 +20,12 @@ class DexBot():
         self.channel_id = channel_id
         self.max_token = max_token
         self.url = url
-        
+        # 初始化 Telegram Bot
+        if not self.api_key:
+            raise ValueError("Telegram Bot Token (API) is not set")
+        if not self.channel_id:
+            raise ValueError("Telegram Channel ID (CHANNEL_ID) is not set")
+        self.bot = telebot.TeleBot(self.api_key)
 
     def generate_sec_websocket_key(self):
         random_bytes = os.urandom(16)
@@ -44,49 +46,68 @@ class DexBot():
         return headers
 
     def format_token_data(self):
-
         """
-        Fetch information about specific tokens from the Dexscreener API.
-
-        Args:
-            token_addresses (list): List of token addresses.
-
-        Returns:
-            dict: A dictionary containing data for each token address or an error message.
+        Fetch information about specific tokens from the Dexscreener API and send to Telegram.
         """
-
         token_addresses = self.start()
-
         base_url = "https://api.dexscreener.com/latest/dex/tokens/"
-        results = {}
+        results = []
 
         for address in token_addresses:
             try:
-                # Make an API call for each token address
                 response = requests.get(f"{base_url}{address}")
                 if response.status_code == 200:
                     data = response.json()
-                    # Store the relevant data for the token address
-                    pairs = data.get('pairs', [])  # 'pairs' contains token market data
-                    
+                    pairs = data.get('pairs', [])
                     if pairs and len(pairs) > 0:
-                        results[address] = pairs[0]  # Store first pair's data
+                        pair_data = pairs[0]
+                        results.append(pair_data)
+                        # 格式化并发送到 Telegram
+                        message = self.format_telegram_message(pair_data)
+                        self.tg_send(message)
                     else:
-                        results[address] = {"pairAddress": address,
-                                            "Error": "No data Retrieved"}
+                        results.append({"pairAddress": address, "Error": "No data Retrieved"})
                 else:
-                    # Handle HTTP errors
-                    results[address] = f"Error: Status code {response.status_code}"
+                    results.append({"pairAddress": address, "Error": f"Status code {response.status_code}"})
             except requests.RequestException as e:
-                # Handle request exceptions
-                results[address] = f"Error making request: {str(e)}"
-
-        # Extracting values as a list
-        results = list(results.values())
-        # Output the result as JSON
+                results.append({"pairAddress": address, "Error": f"Request error: {str(e)}"})
 
         return json.dumps({"data": results}, indent=2)
-      
+
+    def format_telegram_message(self, pair_data):
+        """
+        Format token data into a Telegram message.
+        """
+        try:
+            base_token = pair_data.get('baseToken', {})
+            price_usd = pair_data.get('priceUsd', 'N/A')
+            market_cap = pair_data.get('marketCap', 'N/A')
+            volume = pair_data.get('volume', {}).get('h24', 'N/A')
+            price_change = pair_data.get('priceChange', {}).get('h24', 'N/A')
+            liquidity = pair_data.get('liquidity', {}).get('usd', 'N/A')
+            url = pair_data.get('url', 'N/A')
+            websites = pair_data.get('info', {}).get('websites', [])
+            socials = pair_data.get('info', {}).get('socials', [])
+
+            # 提取网站和 Twitter 链接
+            website_url = next((w['url'] for w in websites if w['label'] == 'Website'), 'N/A')
+            twitter_url = next((s['url'] for s in socials if s['type'] == 'twitter'), 'N/A')
+
+            # 格式化消息 (MarkdownV2 格式)
+            message = (
+                f"*Token*: {base_token.get('name', 'N/A')} \\({base_token.get('symbol', 'N/A')}\\) \n"
+                f"*Price*: \\${price_usd} \n"
+                f"*Market Cap*: \\${market_cap:,.2f} \n"
+                f"*24h Volume*: \\${volume:,.2f} \n"
+                f"*24h Price Change*: {'+' if price_change > 0 else ''}{price_change}% \n"
+                f"*Liquidity*: \\${liquidity:,.2f} \n"
+                f"*Pair*: {url} \n"
+                f"*Website*: {website_url} \n"
+                f"*Twitter*: {twitter_url}"
+            )
+            return message
+        except Exception as e:
+            return f"Error formatting message: {str(e)}"
 
     async def connect(self):
         headers = self.get_headers()
@@ -95,40 +116,38 @@ class DexBot():
             ws = await session.ws_connect(self.url)
             print(self.url)
 
-            # Loop to keep receiving data until the connection is closed
             while True:
                 try:
-                    # Receive data from WebSocket
                     data = await ws.recv()
-
                     if data:
-                        response = data[0]  # Assuming the first element contains the desired message
-                        # Process and return the data or handle it as needed
-                        #print(response)  # You can replace this with your desired processing logic
+                        response = data[0]
                         if "pairs" in str(response):
-                          return response
-
+                            return response
                     else:
-                        # If no data is received, break out of the loop
                         print("No data received.")
                         break
-
                 except Exception as e:
                     print(f"Error receiving message: {str(e)}")
                     break
 
-            # Closing the WebSocket and session after the loop ends
             await ws.close()
             await session.close()
-
         except Exception as e:
             print(f"Connection error: {str(e)}")
             return f"Connection error: {str(e)}"
 
-
     def tg_send(self, message):
+        """
+        Send a message to the Telegram channel.
+        """
         try:
-            self.bot.send_message(self.channel_id, message, parse_mode='MarkdownV2', disable_web_page_preview=True)
+            self.bot.send_message(
+                chat_id=self.channel_id,
+                text=message,
+                parse_mode='MarkdownV2',
+                disable_web_page_preview=True
+            )
+            print(f"Message sent to Telegram: {message[:50]}...")
         except Exception as e:
             print(f"Telegram sending error: {e}")
 
@@ -138,39 +157,24 @@ class DexBot():
         mes = loop.run_until_complete(self.connect())
         loop.close()
 
-        # Decode the message, replacing non-printable characters with spaces
         decoded_text = ''.join(chr(b) if 32 <= b <= 126 else ' ' for b in mes)
-
-        # Split the string by whitespace into words and filter out short words
         words = [word for word in decoded_text.split() if len(word) >= 55]
-
-        # Filter out special characters from words
         filtered_words = [re.sub(r'["*<$@(),.].*', '', word) for word in words]
-
-        # Extract data from words
         extracted_data = []
+
         for token in filtered_words:
             try:
-                # Check if token contains an ETH address
                 if "0x" in token:
                     token = re.findall(r'(0x[0-9a-fA-F]+)', token)[-1]
-                    print(token)
-                # Check if token contains 'pump' keyword
                 elif "pump" in token:
                     token = re.findall(r".{0,40}pump", token)[0]
-                # Otherwise extract the last 44 characters
                 else:
                     token = token[-44:]
-
-            
                 extracted_data.append(token)
             except Exception as e:
                 print(f"There is an error in the token list: {e}")
 
-        
-
         return extracted_data[:60]
-
 
     def token_getter(self, message):
         pass
