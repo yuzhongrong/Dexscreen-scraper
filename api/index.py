@@ -1,10 +1,9 @@
 from flask import Flask, request, render_template
 import json
+import os
 from api.dex import *  # Ensure DexBot is correctly imported
 
 app = Flask(__name__, template_folder='../templates')
-
-
 
 @app.route('/', methods=['GET'])
 def root():
@@ -20,8 +19,8 @@ def dex():
             text += generated_text
         print(text)
 
-        # Initialize DexBot with the generated filter string
-        new_bot = DexBot(Api, text)
+        # Initialize DexBot with the Telegram Bot Token from environment variable
+        new_bot = DexBot(os.environ.get("API"), text)
         mes = new_bot.format_token_data()
 
         # Format the response JSON nicely for display
