@@ -10,20 +10,25 @@ import struct
 from decimal import Decimal, ROUND_DOWN
 import re
 import requests
+import telebot  # 添加 telebot 导入以修复 tg_send
 
 # Apply nest_asyncio
 nest_asyncio.apply()
 
-Api = os.environ["API"]  
-ID = "Channel ID"
+Api = os.environ.get("API")  # Telegram Bot Token
+ID = os.environ.get("CHANNEL_ID", "Channel ID")  # Telegram Channel ID
 
-class DexBot():
-    def __init__(self, api_key, url, channel_id=ID, max_token=10):
+class DexBot:
+    def __init__(self, api_key=Api, url=None, channel_id=ID, max_token=10):
         self.api_key = api_key
         self.channel_id = channel_id
         self.max_token = max_token
         self.url = url
-        
+        if not self.api_key:
+            raise ValueError("Telegram Bot Token (API) is not set")
+        if not self.channel_id:
+            raise ValueError("Telegram Channel ID (CHANNEL_ID) is not set")
+        self.bot = telebot.TeleBot(self.api_key)  # 初始化 Telegram Bot
 
     def generate_sec_websocket_key(self):
         random_bytes = os.urandom(16)
@@ -44,49 +49,42 @@ class DexBot():
         return headers
 
     def format_token_data(self):
-
         """
         Fetch information about specific tokens from the Dexscreener API.
-
-        Args:
-            token_addresses (list): List of token addresses.
+        Filter pairs with liquidity > $10,000.
 
         Returns:
-            dict: A dictionary containing data for each token address or an error message.
+            str: JSON string containing data for each token address.
         """
-
         token_addresses = self.start()
-
         base_url = "https://api.dexscreener.com/latest/dex/tokens/"
         results = {}
 
-        for address in token_addresses:
+        for address in token_addresses[:self.max_token]:
             try:
-                # Make an API call for each token address
-                response = requests.get(f"{base_url}{address}")
+                response = requests.get(f"{base_url}{address}", timeout=10)
                 if response.status_code == 200:
                     data = response.json()
-                    # Store the relevant data for the token address
-                    pairs = data.get('pairs', [])  # 'pairs' contains token market data
-                    
-                    if pairs and len(pairs) > 0:
-                        results[address] = pairs[0]  # Store first pair's data
+                    pairs = data.get('pairs', [])
+                    if pairs:
+                        # 筛选流动性 > $10,000 的交易对
+                        filtered_pairs = [
+                            pair for pair in pairs
+                            if pair.get('liquidity', {}).get('usd', 0) > 10000
+                        ]
+                        if filtered_pairs:
+                            results[address] = filtered_pairs
+                        else:
+                            results[address] = [{"pairAddress": address, "Error": "No pairs with liquidity > $10,000"}]
                     else:
-                        results[address] = {"pairAddress": address,
-                                            "Error": "No data Retrieved"}
+                        results[address] = [{"pairAddress": address, "Error": "No data retrieved"}]
                 else:
-                    # Handle HTTP errors
-                    results[address] = f"Error: Status code {response.status_code}"
+                    results[address] = [{"pairAddress": address, "Error": f"Status code {response.status_code}"}]
             except requests.RequestException as e:
-                # Handle request exceptions
-                results[address] = f"Error making request: {str(e)}"
-
-        # Extracting values as a list
-        results = list(results.values())
-        # Output the result as JSON
+                results[address] = [{"pairAddress": address, "Error": f"Request error: {str(e)}"}]
+            time.sleep(0.5)  # API 调用间隔
 
         return json.dumps({"data": results}, indent=2)
-      
 
     async def connect(self):
         headers = self.get_headers()
@@ -95,36 +93,25 @@ class DexBot():
             ws = await session.ws_connect(self.url)
             print(self.url)
 
-            # Loop to keep receiving data until the connection is closed
             while True:
                 try:
-                    # Receive data from WebSocket
                     data = await ws.recv()
-
                     if data:
-                        response = data[0]  # Assuming the first element contains the desired message
-                        # Process and return the data or handle it as needed
-                        #print(response)  # You can replace this with your desired processing logic
+                        response = data[0]
                         if "pairs" in str(response):
-                          return response
-
+                            return response
                     else:
-                        # If no data is received, break out of the loop
                         print("No data received.")
                         break
-
                 except Exception as e:
                     print(f"Error receiving message: {str(e)}")
                     break
 
-            # Closing the WebSocket and session after the loop ends
             await ws.close()
             await session.close()
-
         except Exception as e:
             print(f"Connection error: {str(e)}")
             return f"Connection error: {str(e)}"
-
 
     def tg_send(self, message):
         try:
@@ -138,39 +125,25 @@ class DexBot():
         mes = loop.run_until_complete(self.connect())
         loop.close()
 
-        # Decode the message, replacing non-printable characters with spaces
         decoded_text = ''.join(chr(b) if 32 <= b <= 126 else ' ' for b in mes)
-
-        # Split the string by whitespace into words and filter out short words
         words = [word for word in decoded_text.split() if len(word) >= 55]
-
-        # Filter out special characters from words
         filtered_words = [re.sub(r'["*<$@(),.].*', '', word) for word in words]
-
-        # Extract data from words
         extracted_data = []
+
         for token in filtered_words:
             try:
-                # Check if token contains an ETH address
                 if "0x" in token:
                     token = re.findall(r'(0x[0-9a-fA-F]+)', token)[-1]
                     print(token)
-                # Check if token contains 'pump' keyword
                 elif "pump" in token:
                     token = re.findall(r".{0,40}pump", token)[0]
-                # Otherwise extract the last 44 characters
                 else:
                     token = token[-44:]
-
-            
                 extracted_data.append(token)
             except Exception as e:
                 print(f"There is an error in the token list: {e}")
 
-        
-
-        return extracted_data[:60]
-
+        return extracted_data[:self.max_token]
 
     def token_getter(self, message):
         pass

@@ -23,7 +23,6 @@ def dex():
         # Initialize DexBot with the generated filter string
         new_bot = DexBot(Api, text)
         mes = new_bot.format_token_data()
-        new_bot.tg_send(mes)
 
         # Format the response JSON nicely for display
         mes_json = json.dumps(json.loads(mes), indent=4)
