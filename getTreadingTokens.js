@@ -41,7 +41,7 @@ async function filterPools() {
     );
 
     // 输出结果到控制台
-    console.log(JSON.stringify(result, null, 2));
+    // console.log(JSON.stringify(result, null, 2));
 
     // 返回结果以供后续处理
     return result;
