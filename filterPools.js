@@ -11,7 +11,13 @@ function logError(message) {
 async function initDatabase() {
   try {
     const pool = await dbSingleton.getMySQL();
-    
+  
+  // 1. 创建数据库（如果不存在）
+  await pool.query(`CREATE DATABASE IF NOT EXISTS dex_pools`).catch(console.error);
+  
+  // 2. 切换到该数据库
+  await pool.query(`USE dex_pools`);
+  
     await pool.query(`
       CREATE TABLE IF NOT EXISTS token_pools (
         token_address VARCHAR(42) PRIMARY KEY,

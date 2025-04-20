@@ -24,7 +24,8 @@ class DBSingleton {
       database: process.env.MYSQL_DATABASE || 'dex_pools',
       waitForConnections: true,
       connectionLimit: 10,
-      queueLimit: 0
+      queueLimit: 0,
+      multipleStatements: true  // 允许执行多条SQL
     });
 
     // Redis 客户端配置
