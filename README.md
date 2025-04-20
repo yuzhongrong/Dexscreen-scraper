@@ -159,3 +159,7 @@ If you want to run on a specific filter, define the filter. By default the `/dex
 ## Support 💬
 
 If you encounter any issues or have any questions, feel free to reach out to dawitneri888@gmail.com or open an issue in the GitHub repository. Thank you for using my app.
+
+## Command
+
+scp root@156.67.63.75:/root/Dexscreen-scraper/pool.json ./pool.json
