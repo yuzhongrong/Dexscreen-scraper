@@ -51,7 +51,7 @@ class DexBot:
     def format_token_data(self):
         """
         Fetch information about specific tokens from the Dexscreener API.
-        Filter pairs with liquidity > $10,000.
+        Filter pairs with pairType AMM or DLMM.
 
         Returns:
             str: JSON string containing data for each token address.
@@ -67,15 +67,15 @@ class DexBot:
                     data = response.json()
                     pairs = data.get('pairs', [])
                     if pairs:
-                        # 筛选流动性 > $10,000 的交易对
+                        # 筛选 pairType 为 AMM 或 DLMM 的交易对
                         filtered_pairs = [
                             pair for pair in pairs
-                            if pair.get('liquidity', {}).get('usd', 0) > 10000
+                            if pair.get('pairType') in ["AMM", "DLMM"]
                         ]
                         if filtered_pairs:
                             results[address] = filtered_pairs
                         else:
-                            results[address] = [{"pairAddress": address, "Error": "No pairs with liquidity > $10,000"}]
+                            results[address] = [{"pairAddress": address, "Error": "No AMM or DLMM pairs found"}]
                     else:
                         results[address] = [{"pairAddress": address, "Error": "No data retrieved"}]
                 else:
