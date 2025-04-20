@@ -9,7 +9,7 @@ import time
 import struct
 from decimal import Decimal, ROUND_DOWN
 import re
-import requests
+import aiohttp  # 替换 requests 以支持异步请求
 import telebot
 
 # Apply nest_asyncio
@@ -19,7 +19,7 @@ Api = os.environ.get("API")  # Telegram Bot Token
 ID = os.environ.get("CHANNEL_ID", "Channel ID")  # Telegram Channel ID
 
 class DexBot:
-    def __init__(self, api_key=Api, url=None, channel_id=ID, max_token=10):
+    def __init__(self, api_key=Api, url=None, channel_id=ID, max_token=3):  # 减少默认 max_token
         self.api_key = api_key
         self.channel_id = channel_id
         self.max_token = max_token
@@ -28,7 +28,7 @@ class DexBot:
             raise ValueError("Telegram Bot Token (API) is not set")
         if not self.channel_id:
             raise ValueError("Telegram Channel ID (CHANNEL_ID) is not set")
-        self.bot = telebot.TeleBot(self.api_key)  # 初始化 Telegram Bot
+        self.bot = telebot.TeleBot(self.api_key)
 
     def generate_sec_websocket_key(self):
         random_bytes = os.urandom(16)
@@ -48,7 +48,22 @@ class DexBot:
         }
         return headers
 
-    def format_token_data(self):
+    async def fetch_token_data(self, address, session):
+        """异步获取单个代币的交易对数据"""
+        base_url = "https://api.dexscreener.com/latest/dex/tokens/"
+        try:
+            async with session.get(f"{base_url}{address}", timeout=5) as response:
+                if response.status == 200:
+                    data = await response.json()
+                    pairs = data.get('pairs', [])
+                    if pairs:
+                        return address, pairs
+                    return address, [{"pairAddress": address, "Error": "No pairs found"}]
+                return address, [{"pairAddress": address, "Error": f"Status code {response.status}"}]
+        except Exception as e:
+            return address, [{"pairAddress": address, "Error": f"Request error: {str(e)}"}]
+
+    async def format_token_data(self):
         """
         Fetch information about specific tokens from the Dexscreener API.
         Return all pairs without filtering.
@@ -57,24 +72,14 @@ class DexBot:
             str: JSON string containing data for each token address.
         """
         token_addresses = self.start()
-        base_url = "https://api.dexscreener.com/latest/dex/tokens/"
         results = {}
 
-        for address in token_addresses[:self.max_token]:
-            try:
-                response = requests.get(f"{base_url}{address}", timeout=15)
-                if response.status_code == 200:
-                    data = response.json()
-                    pairs = data.get('pairs', [])
-                    if pairs:
-                        results[address] = pairs  # 保留所有交易对
-                    else:
-                        results[address] = [{"pairAddress": address, "Error": "No pairs found"}]
-                else:
-                    results[address] = [{"pairAddress": address, "Error": f"Status code {response.status_code}"}]
-            except requests.RequestException as e:
-                results[address] = [{"pairAddress": address, "Error": f"Request error: {str(e)}"}]
-            time.sleep(1)  # 避免速率限制
+        async with aiohttp.ClientSession() as session:
+            tasks = [self.fetch_token_data(address, session) for address in token_addresses[:self.max_token]]
+            responses = await asyncio.gather(*tasks, return_exceptions=True)
+
+            for address, result in responses:
+                results[address] = result
 
         return json.dumps({"data": results}, indent=2)
 
@@ -82,7 +87,7 @@ class DexBot:
         headers = self.get_headers()
         try:
             session = AsyncSession(headers=headers)
-            ws = await session.ws_connect(self.url)
+            ws = await session.ws_connect(self.url, timeout=5)  # 添加超时
             print(self.url)
 
             while True:
