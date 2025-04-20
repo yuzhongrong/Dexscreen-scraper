@@ -13,32 +13,32 @@ function logError(message) {
  * 初始化数据库和表结构
  */
 async function initDatabase() {
-    try {
-        const pool = await dbSingleton.getMySQL();
+  try {
+    const pool = await dbSingleton.getMySQL();
 
-        // 1. 创建数据库（如果不存在）
-        await pool.query('CREATE DATABASE IF NOT EXISTS dex_pools');
+    // 1. 创建数据库（如果不存在）
+    await pool.query('CREATE DATABASE IF NOT EXISTS dex_pools');
 
-        // 2. 切换到该数据库
-        await pool.query('USE dex_pools');
+    // 2. 切换到该数据库
+    await pool.query('USE dex_pools');
 
-        // 3. 创建表
-        await pool.query(`
-            CREATE TABLE IF NOT EXISTS token_pools (
-                token_address VARCHAR(42) PRIMARY KEY,
-                pools JSON NOT NULL,
-                created_at BIGINT NOT NULL,
-                updated_at BIGINT NOT NULL,
-                INDEX (created_at),
-                INDEX (updated_at)
-            )
-        `);
+    // 3. 创建表
+    await pool.query(`
+        CREATE TABLE IF NOT EXISTS token_pools (
+            token_address VARCHAR(42) PRIMARY KEY,
+            pools JSON NOT NULL,
+            created_at BIGINT NOT NULL,
+            updated_at BIGINT NOT NULL,
+            INDEX (created_at),
+            INDEX (updated_at)
+        )
+    `);
 
-        logError('数据库表初始化完成');
-    } catch (error) {
-        logError(`数据库表初始化失败: ${error.message}`);
-        throw error;
-    }
+    logError('数据库表初始化完成');
+} catch (error) {
+    logError(`数据库表初始化失败: ${error.message}`);
+    throw error;
+}
 }
 
 /**

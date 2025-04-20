@@ -18,10 +18,10 @@ class DBSingleton {
   async initialize() {
     // MySQL 连接池配置
     this.mysqlPool = mysql.createPool({
-      host: process.env.MYSQL_HOST || 'localhost',
-      user: process.env.MYSQL_USER || 'root',
-      password: process.env.MYSQL_PASSWORD || 'Abc5341842...',
-      database: process.env.MYSQL_DATABASE || 'dex_pools',
+      host:'localhost',
+      user:'root',
+      password:'Abc5341842...',
+      database:'dex_pools',
       waitForConnections: true,
       connectionLimit: 10,
       queueLimit: 0,
@@ -30,8 +30,8 @@ class DBSingleton {
 
     // Redis 客户端配置
     this.redisClient = redis.createClient({
-      host: process.env.REDIS_HOST || 'localhost',
-      port: process.env.REDIS_PORT || 6379
+      host:'localhost',
+      port:6379
     });
 
     // Promisify Redis 方法
