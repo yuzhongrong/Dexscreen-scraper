@@ -70,7 +70,7 @@ class DexBot:
                         # 筛选 pairType 为 AMM 或 DLMM 的交易对
                         filtered_pairs = [
                             pair for pair in pairs
-                            if pair.get('pairType') in ["AMM", "DLMM"]
+                            if pair.get('labels') in ["AMM", "DLMM"]
                         ]
                         if filtered_pairs:
                             results[address] = filtered_pairs
