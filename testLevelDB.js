@@ -1,7 +1,7 @@
-const level = require('level'); // 使用 LevelDB 作为 key-value 存储
+const { Level } = require('level'); // 正确导入方式
 
 // 初始化 LevelDB 数据库
-const db = level('./tokenPoolsDB', { valueEncoding: 'json' });
+const db = Level('./tokenPoolsDB', { valueEncoding: 'json' });
 
 // 获取所有数据并按 createdAt 或 updatedAt 排序
 async function getSortedByTimestamp(sortBy = 'createdAt') {

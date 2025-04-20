@@ -1,14 +1,10 @@
-let level;
-try {
-  level = require('level');
-} catch (error) {
-  console.error('无法加载 level 模块:', error.message);
-  process.exit(1);
-}
+const { Level } = require('level'); // 正确导入方式
 
+// 初始化 LevelDB
 let db;
 try {
-  db = level('./testDB', { valueEncoding: 'json' });
+  db = new Level('./tokenPoolsDB', { valueEncoding: 'json' });
+  console.log('成功初始化 LevelDB');
 } catch (error) {
   console.error('无法初始化 LevelDB:', error.message);
   process.exit(1);
