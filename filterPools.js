@@ -45,35 +45,35 @@ async function initDatabase() {
  * 从 MySQL 加载所有数据到 Redis 缓存
  */
 async function loadAllToRedis() {
-    const mysqlPool = await dbSingleton.getMySQL();
-    const redis = await dbSingleton.getRedis();
+  const mysqlPool = await dbSingleton.getMySQL();
+  const redis = await dbSingleton.getRedis();
 
-    try {
-        logError('开始从 MySQL 加载数据到 Redis...');
+  try {
+      logError('开始从 MySQL 加载数据到 Redis...');
 
-        // 1. 获取所有数据
-        const [rows] = await mysqlPool.query('SELECT * FROM token_pools');
+      // 1. 获取所有数据
+      const [rows] = await mysqlPool.query('SELECT * FROM token_pools');
 
-        // 2. 批量写入 Redis
-        const pipeline = redis.pipeline();
-        rows.forEach(row => {
-            pipeline.set(
-                `pool:${row.token_address}`,
-                JSON.stringify({
-                    pools: JSON.parse(row.pools),
-                    createdAt: row.created_at,
-                    updatedAt: row.updated_at
-                }),
-                'EX', 3600 * 24 // 缓存24小时
-            );
-        });
+      // 2. 批量写入 Redis
+      const pipeline = redis.pipeline();
+      rows.forEach(row => {
+          pipeline.set(
+              `pool:${row.token_address}`,
+              JSON.stringify({
+                  pools: JSON.parse(row.pools),
+                  createdAt: row.created_at,
+                  updatedAt: row.updated_at
+              }),
+              'EX', 3600 * 24 // 缓存24小时
+          );
+      });
 
-        await pipeline.exec();
-        logError(`成功加载 ${rows.length} 条数据到 Redis`);
-    } catch (error) {
-        logError(`从 MySQL 加载数据到 Redis 失败: ${error.message}`);
-        throw error;
-    }
+      await pipeline.exec();
+      logError(`成功加载 ${rows.length} 条数据到 Redis`);
+  } catch (error) {
+      logError(`从 MySQL 加载数据到 Redis 失败: ${error.message}`);
+      throw error;
+  }
 }
 
 /**
