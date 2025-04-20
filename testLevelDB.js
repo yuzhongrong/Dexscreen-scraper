@@ -1,33 +1,24 @@
-let Level;
-try {
-    Level = require('level');
-  console.log('成功加载 level 模块:', typeof level);
-} catch (error) {
-  console.error('无法加载 level 模块:', error.message);
-  process.exit(1);
-}
+const { Level } = require('level');
 
-// 初始化 LevelDB 数据库
+// 初始化 LevelDB
 let db;
-async function initializeDB() {
-  try {
-    db = new Level('./tokenPoolsDB', { valueEncoding: 'json' });
-    console.log('成功初始化 LevelDB');
-    return db;
-  } catch (error) {
-    console.error('无法初始化 LevelDB:', error.message);
-    process.exit(1);
-  }
+try {
+  db = new Level('./tokenPoolsDB', { valueEncoding: 'json' });
+  console.log('成功初始化 LevelDB');
+} catch (error) {
+  console.error('无法初始化 LevelDB:', error.message);
+  process.exit(1);
 }
 
 // 检查数据库状态并重新初始化（如果需要）
 async function ensureDBOpen() {
   try {
-    if (!db || !db.isOpen()) {
+    if (!db || db.status !== 'open') {
       console.log('数据库未打开或未初始化，正在初始化...');
-      await initializeDB();
+      db = new Level('./tokenPoolsDB', { valueEncoding: 'json' });
+      await db.open(); // 确保数据库打开
     }
-    console.log('数据库状态:', db.isOpen() ? '打开' : '关闭');
+    console.log('数据库状态:', db.status);
     return db;
   } catch (error) {
     console.error('检查或初始化数据库失败:', error.message);
