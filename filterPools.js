@@ -100,6 +100,6 @@ async function runScheduledTask() {
   }
 }
 
-// 立即运行一次，然后每  5分钟运行
+// 立即运行一次，然后每  2分钟运行
 runScheduledTask();
-setInterval(runScheduledTask, 5 * 60 * 1000);
+setInterval(runScheduledTask, 2 * 60 * 1000);
