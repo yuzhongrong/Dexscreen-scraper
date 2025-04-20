@@ -1,12 +1,13 @@
 const axios = require('axios');
-let level;
-try {
-  level = require('level');
-  console.log('成功加载 level 模块');
-} catch (error) {
-  console.error('无法加载 level 模块:', error.message);
-  process.exit(1);
-}
+const  level = require('level');
+// let level;
+// try {
+ 
+//   console.log('成功加载 level 模块');
+// } catch (error) {
+//   console.error('无法加载 level 模块:', error.message);
+//   process.exit(1);
+// }
 
 // 初始化 LevelDB 数据库
 let db;
