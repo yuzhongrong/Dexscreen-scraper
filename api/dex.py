@@ -19,7 +19,7 @@ Api = os.environ.get("API")  # 使用 get 避免 KeyError
 ID = os.environ.get("CHANNEL_ID", "Channel ID")  # 添加默认值
 
 class DexBot:
-    def __init__(self, api_key=Api, url=None, channel_id=ID, max_token=10):
+    def __init__(self, api_key=Api, url=None, channel_id=ID, max_token=2):
         self.api_key = api_key
         self.channel_id = channel_id
         self.max_token = max_token
