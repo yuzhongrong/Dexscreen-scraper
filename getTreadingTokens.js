@@ -7,22 +7,27 @@ async function filterPools() {
     const response = await axios.get('http://127.0.0.1:5000/dex/json');
     const data = response.data;
 
-    // 定义需要保留的标签，基于提供的 JSON 数据
+    // 定义需要保留的标签
     const allowedLabels = ['DLMM', 'CLMM', 'CPMM'];
 
     // 过滤数据
     const filteredData = Object.entries(data.data).reduce((acc, [tokenAddress, pools]) => {
-      // 过滤池子：只保留 DLMM、CLMM 或 CPMM 类型的池子，且流动性大于 1000 美金
+      // 过滤池子：保留 DLMM、CLMM、CPMM 类型的池子或 pumpswap 池子，且流动性大于 1000 美金
       const filteredPools = pools.filter((pool) => {
-        // 检查池子是否包含允许的标签
+        // 检查池子是否为 pumpswap 或包含允许的标签
+        const isPumpswap = pool.dexId === 'pumpswap';
         const hasAllowedLabel = pool.labels?.some((label) => allowedLabels.includes(label));
         // 检查流动性是否大于 1000 美金
         const hasSufficientLiquidity = pool.liquidity?.usd > 1000;
-        return hasAllowedLabel && hasSufficientLiquidity;
+        return (isPumpswap || hasAllowedLabel) && hasSufficientLiquidity;
       });
 
-      // 如果有符合条件的池子，添加到结果中
-      if (filteredPools.length > 0) {
+      // 检查是否有 AMM (CLMM 或 CPMM) 和 DLMM 类型的池子
+      const hasAMM = filteredPools.some((pool) => pool.labels?.includes('CLMM') || pool.labels?.includes('CPMM'));
+      const hasDLMM = filteredPools.some((pool) => pool.labels?.includes('DLMM'));
+
+      // 只有当同时有 AMM 和 DLMM 池子且池子数量大于 0 时才保留
+      if (hasAMM && hasDLMM && filteredPools.length > 0) {
         acc[tokenAddress] = filteredPools;
       }
 
