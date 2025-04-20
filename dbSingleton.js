@@ -20,7 +20,7 @@ class DBSingleton {
     this.mysqlPool = mysql.createPool({
       host: process.env.MYSQL_HOST || 'localhost',
       user: process.env.MYSQL_USER || 'root',
-      password: process.env.MYSQL_PASSWORD || '',
+      password: process.env.MYSQL_PASSWORD || 'Abc5341842...',
       database: process.env.MYSQL_DATABASE || 'dex_pools',
       waitForConnections: true,
       connectionLimit: 10,
