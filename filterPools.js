@@ -1,24 +1,15 @@
 const axios = require('axios');
-const  level = require('level');
-// let level;
-// try {
- 
-//   console.log('成功加载 level 模块');
-// } catch (error) {
-//   console.error('无法加载 level 模块:', error.message);
-//   process.exit(1);
-// }
+const { Level } = require('level'); // 正确导入方式
 
-// 初始化 LevelDB 数据库
+// 初始化 LevelDB
 let db;
 try {
-  db = level('./tokenPoolsDB', { valueEncoding: 'json' });
+  db = new Level('./tokenPoolsDB', { valueEncoding: 'json' });
   console.log('成功初始化 LevelDB');
 } catch (error) {
   console.error('无法初始化 LevelDB:', error.message);
   process.exit(1);
 }
-
 // 过滤池子的函数
 async function filterPools() {
   try {
@@ -109,6 +100,6 @@ async function runScheduledTask() {
   }
 }
 
-// 立即运行一次，然后每 5 分钟运行
+// 立即运行一次，然后每  5分钟运行
 runScheduledTask();
 setInterval(runScheduledTask, 5 * 60 * 1000);
