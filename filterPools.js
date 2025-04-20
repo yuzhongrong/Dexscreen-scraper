@@ -13,67 +13,68 @@ function logError(message) {
  * 初始化数据库和表结构
  */
 async function initDatabase() {
-  try {
-    const pool = await dbSingleton.getMySQL();
+    try {
+        const pool = await dbSingleton.getMySQL();
 
-    // 1. 创建数据库（如果不存在）
-    await pool.query('CREATE DATABASE IF NOT EXISTS dex_pools');
+        // 1. 创建数据库（如果不存在）
+        await pool.query('CREATE DATABASE IF NOT EXISTS dex_pools');
 
-    // 2. 切换到该数据库
-    await pool.query('USE dex_pools');
+        // 2. 切换到该数据库
+        await pool.query('USE dex_pools');
 
-    // 3. 创建表
-    await pool.query(`
-        CREATE TABLE IF NOT EXISTS token_pools (
-            token_address VARCHAR(42) PRIMARY KEY,
-            pools JSON NOT NULL,
-            created_at BIGINT NOT NULL,
-            updated_at BIGINT NOT NULL,
-            INDEX (created_at),
-            INDEX (updated_at)
-        )
-    `);
+        // 3. 创建表
+        await pool.query(`
+            CREATE TABLE IF NOT EXISTS token_pools (
+                token_address VARCHAR(42) PRIMARY KEY,
+                pools JSON NOT NULL,
+                created_at BIGINT NOT NULL,
+                updated_at BIGINT NOT NULL,
+                INDEX (created_at),
+                INDEX (updated_at)
+            )
+        `);
 
-    logError('数据库表初始化完成');
-} catch (error) {
-    logError(`数据库表初始化失败: ${error.message}`);
-    throw error;
-}
+        logError('数据库表初始化完成');
+    } catch (error) {
+        logError(`数据库表初始化失败: ${error.message}`);
+        throw error;
+    }
 }
 
 /**
  * 从 MySQL 加载所有数据到 Redis 缓存
  */
 async function loadAllToRedis() {
-  const mysqlPool = await dbSingleton.getMySQL();
-  const redis = await dbSingleton.getRedis();
+    const mysqlPool = await dbSingleton.getMySQL();
+    const redis = await dbSingleton.getRedis();
 
-  try {
-      logError('开始从 MySQL 加载数据到 Redis...');
+    try {
+        logError('开始从 MySQL 加载数据到 Redis...');
 
-      // 1. 获取所有数据
-      const [rows] = await mysqlPool.query('SELECT * FROM token_pools');
+        // 1. 获取所有数据
+        const [rows] = await mysqlPool.query('SELECT * FROM token_pools');
 
-      // 2. 批量写入 Redis
-      const pipeline = redis.pipeline();
-      rows.forEach(row => {
-          pipeline.set(
-              `pool:${row.token_address}`,
-              JSON.stringify({
-                  pools: JSON.parse(row.pools),
-                  createdAt: row.created_at,
-                  updatedAt: row.updated_at
-              }),
-              'EX', 3600 * 24 // 缓存24小时
-          );
-      });
+        // 2. 使用 multi 进行批量写入
+        const multi = redis.multi();
+        rows.forEach(row => {
+            multi.set(
+                `pool:${row.token_address}`,
+                JSON.stringify({
+                    pools: JSON.parse(row.pools),
+                    createdAt: row.created_at,
+                    updatedAt: row.updated_at
+                }),
+                { EX: 3600 * 24 } // 缓存24小时
+            );
+        });
 
-      await pipeline.exec();
-      logError(`成功加载 ${rows.length} 条数据到 Redis`);
-  } catch (error) {
-      logError(`从 MySQL 加载数据到 Redis 失败: ${error.message}`);
-      throw error;
-  }
+        // 执行批量操作
+        await multi.exec();
+        logError(`成功加载 ${rows.length} 条数据到 Redis`);
+    } catch (error) {
+        logError(`从 MySQL 加载数据到 Redis 失败: ${error.message}`);
+        throw error;
+    }
 }
 
 /**
@@ -130,7 +131,7 @@ async function storeToDatabase(result) {
     const timestamp = Date.now();
 
     try {
-        const pipeline = redis.pipeline();
+        const multi = redis.multi();
 
         for (const [tokenAddress, pools] of Object.entries(result)) {
             // 检查是否已存在
@@ -156,19 +157,20 @@ async function storeToDatabase(result) {
                 ]
             );
 
-            // 添加到 Redis pipeline
-            pipeline.set(
+            // 添加到 Redis multi
+            multi.set(
                 `pool:${tokenAddress}`,
                 JSON.stringify({
                     pools,
                     createdAt,
                     updatedAt: timestamp
                 }),
-                'EX', 3600 * 24 // 缓存24小时
+                { EX: 3600 * 24 } // 缓存24小时
             );
         }
 
-        await pipeline.exec();
+        // 执行批量操作
+        await multi.exec();
         logError(`成功存储 ${Object.keys(result).length} 条数据到数据库和缓存`);
     } catch (error) {
         logError(`存储到数据库时出错: ${error.message}`);
