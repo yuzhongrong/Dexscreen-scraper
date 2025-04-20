@@ -1,53 +1,76 @@
-const axios = require('axios'); // 使用 axios 进行 HTTP 请求
+const axios = require("axios");
 
-// 过滤池子的函数
-async function filterPools() {
-  try {
-    // 从接口获取数据
-    const response = await axios.get('http://127.0.0.1:5000/dex/json');
-    const data = response.data;
+// Function to convert timestamp to readable date
+const timestampToDate = (timestamp) => {
+  return new Date(timestamp).toUTCString();
+};
 
-    // 定义需要保留的标签
-    const allowedLabels = ['AMM', 'DLMM'];
+// Function to summarize token data
+const summarizeTokenData = (tokenData, tokenName) => {
+  console.log(`\n=== Summary for ${tokenName} ===`);
+  tokenData.forEach((pair) => {
+    const dexId = pair.dexId || "Unknown";
+    const pairAddress = pair.pairAddress || "Unknown";
+    const priceUsd = parseFloat(pair.priceUsd || 0);
+    const liquidityUsd = pair.liquidity?.usd || 0;
+    const volumeH24 = pair.volume?.h24 || 0;
+    const priceChangeH24 = pair.priceChange?.h24 || 0;
+    const pairCreatedAt = timestampToDate(pair.pairCreatedAt || 0);
+    const quoteToken = pair.quoteToken?.symbol || "Unknown";
 
-    // 过滤数据
-    const filteredData = Object.entries(data).reduce((acc, [tokenAddress, pools]) => {
-      // 过滤池子：只保留 AMM 和 DLMM 类型的池子，且流动性大于 1000 美金
-      const filteredPools = pools.filter((pool) => {
-        // 检查池子是否包含 AMM 或 DLMM 标签
-        const hasAllowedLabel = pool.labels?.some((label) => allowedLabels.includes(label));
-        // 检查流动性是否大于 1000 美金
-        const hasSufficientLiquidity = pool.liquidity?.usd > 1000;
-        return hasAllowedLabel && hasSufficientLiquidity;
-      });
+    console.log(`\nDEX: ${dexId}`);
+    console.log(`Pair Address: ${pairAddress}`);
+    console.log(`Price (USD): $${priceUsd.toFixed(6)}`);
+    console.log(`Liquidity (USD): $${liquidityUsd.toLocaleString("en-US", { minimumFractionDigits: 2 })}`);
+    console.log(`24h Volume (USD): $${volumeH24.toLocaleString("en-US", { minimumFractionDigits: 2 })}`);
+    console.log(`24h Price Change: ${priceChangeH24.toFixed(2)}%`);
+    console.log(`Pair Created At: ${pairCreatedAt}`);
+    console.log(`Quote Token: ${quoteToken}`);
+  });
+};
 
-      // 检查是否有 AMM 和 DLMM 类型的池子
-      const hasAMM = filteredPools.some((pool) => pool.labels?.includes('AMM'));
-      const hasDLMM = filteredPools.some((pool) => pool.labels?.includes('DLMM'));
+// Function to compare tokens across DEXs
+const compareTokens = (data) => {
+  const tokens = data.data || {};
 
-      // 只有当同时有 AMM 和 DLMM 池子且池子数量大于 0 时才保留
-      if (hasAMM && hasDLMM && filteredPools.length > 0) {
-        acc[tokenAddress] = filteredPools;
-      }
+  for (const [tokenAddress, tokenData] of Object.entries(tokens)) {
+    const tokenName = tokenData[0]?.baseToken?.name || "Unknown";
+    summarizeTokenData(tokenData, tokenName);
 
-      return acc;
-    }, {});
+    // Calculate average price and total liquidity
+    const prices = tokenData
+      .filter((pair) => pair.priceUsd)
+      .map((pair) => parseFloat(pair.priceUsd));
+    const liquidities = tokenData
+      .filter((pair) => pair.liquidity?.usd)
+      .map((pair) => pair.liquidity.usd);
 
-    // 移除没有池子的 token
-    const result = Object.fromEntries(
-      Object.entries(filteredData).filter(([_, pools]) => pools.length > 0)
-    );
+    const avgPrice = prices.length ? prices.reduce((sum, p) => sum + p, 0) / prices.length : 0;
+    const totalLiquidity = liquidities.length ? liquidities.reduce((sum, l) => sum + l, 0) : 0;
 
-    // 输出结果
-    console.log(JSON.stringify(result, null, 2));
-    return result;
-  } catch (error) {
-    console.error('Error fetching or processing data:', error.message);
-    throw error;
+    console.log(`\n--- ${tokenName} Aggregated Stats ---`);
+    console.log(`Average Price (USD): $${avgPrice.toFixed(6)}`);
+    console.log(`Total Liquidity (USD): $${totalLiquidity.toLocaleString("en-US", { minimumFractionDigits: 2 })}`);
   }
-}
+};
 
-// 执行过滤
-filterPools()
-  .then(() => console.log('Filtering completed'))
-  .catch((err) => console.error('Filtering failed:', err));
+// Function to fetch JSON data from local interface
+const fetchTokenData = async () => {
+  try {
+    // Adjust the URL based on your local server's address and port
+    const response = await axios.get("http://localhost:3000/dex/json");
+    const jsonData = response.data;
+
+    // Process the fetched data
+    compareTokens(jsonData);
+  } catch (error) {
+    console.error(`Error fetching or processing JSON data: ${error.message}`);
+    if (error.response) {
+      console.error(`Status: ${error.response.status}`);
+      console.error(`Data: ${JSON.stringify(error.response.data)}`);
+    }
+  }
+};
+
+// Main execution
+fetchTokenData();
