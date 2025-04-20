@@ -163,3 +163,35 @@ If you encounter any issues or have any questions, feel free to reach out to daw
 ## Command
 
 scp root@156.67.63.75:/root/Dexscreen-scraper/pool.json ./pool.json
+
+## Install the mongo db
+
+sudo apt-get purge mongodb mongodb-org mongodb-server mongodb-clients
+sudo apt-get autoremove
+sudo rm -r /var/log/mongodb /var/lib/mongodb
+
+wget -qO - https://www.mongodb.org/static/pgp/server-8.0.asc | sudo gpg --dearmor -o /usr/share/keyrings/mongodb-server-8.0.gpg
+
+对于 Ubuntu 22.04（Jammy）：
+echo "deb [ arch=amd64,arm64 signed-by=/usr/share/keyrings/mongodb-server-8.0.gpg ] https://repo.mongodb.org/apt/ubuntu jammy/mongodb-org/8.0 multiverse" | sudo tee /etc/apt/sources.list.d/mongodb-org-8.0.list
+
+Ubuntu 20.04（Focal）
+echo "deb [ arch=amd64,arm64 signed-by=/usr/share/keyrings/mongodb-server-8.0.gpg ] https://repo.mongodb.org/apt/ubuntu focal/mongodb-org/8.0 multiverse" | sudo tee /etc/apt/sources.list.d/mongodb-org-8.0.list
+
+Ubuntu 18.04（Bionic）
+echo "deb [ arch=amd64,arm64 signed-by=/usr/share/keyrings/mongodb-server-8.0.gpg ] https://repo.mongodb.org/apt/ubuntu bionic/mongodb-org/8.0 multiverse" | sudo tee /etc/apt/sources.list.d/mongodb-org-8.0.list
+
+检查 Ubuntu 版本：
+lsb_release -sc
+
+sudo apt-get update
+
+sudo apt-get install -y mongodb-org
+
+或者使用 MongoDB 6.0 或更高版本，支持 libssl3，无需额外依赖：
+bash
+
+wget -qO - https://www.mongodb.org/static/pgp/server-6.0.asc | sudo gpg --dearmor -o /usr/share/keyrings/mongodb-server-6.0.gpg
+echo "deb [ arch=amd64,arm64 signed-by=/usr/share/keyrings/mongodb-server-6.0.gpg ] https://repo.mongodb.org/apt/ubuntu jammy/mongodb-org/6.0 multiverse" | sudo tee /etc/apt/sources.list.d/mongodb-org-6.0.list
+sudo apt-get update
+sudo apt-get install -y mongodb-org

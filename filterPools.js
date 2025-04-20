@@ -10,57 +10,41 @@ function logError(message) {
 }
 
 /**
- * 初始化数据库和表结构
+ * 初始化数据库（MongoDB 无需显式创建集合）
  */
 async function initDatabase() {
     try {
-        const pool = await dbSingleton.getMySQL();
-
-        // 1. 创建数据库（如果不存在）
-        await pool.query('CREATE DATABASE IF NOT EXISTS dex_pools');
-
-        // 2. 切换到该数据库
-        await pool.query('USE dex_pools');
-
-        // 3. 创建表
-        await pool.query(`
-            CREATE TABLE IF NOT EXISTS token_pools (
-                token_address VARCHAR(42) PRIMARY KEY,
-                pools JSON NOT NULL,
-                created_at BIGINT NOT NULL,
-                updated_at BIGINT NOT NULL,
-                INDEX (created_at),
-                INDEX (updated_at)
-            )
-        `);
-
-        logError('数据库表初始化完成');
+        const db = await dbSingleton.getMongoDb();
+        // 创建索引以优化查询
+        await db.collection('token_pools').createIndex({ created_at: -1 });
+        await db.collection('token_pools').createIndex({ updated_at: -1 });
+        logError('MongoDB 集合初始化完成');
     } catch (error) {
-        logError(`数据库表初始化失败: ${error.message}`);
+        logError(`数据库初始化失败: ${error.message}`);
         throw error;
     }
 }
 
 /**
- * 从 MySQL 加载所有数据到 Redis 缓存
+ * 从 MongoDB 加载所有数据到 Redis 缓存
  */
 async function loadAllToRedis() {
-    const mysqlPool = await dbSingleton.getMySQL();
+    const db = await dbSingleton.getMongoDb();
     const redis = await dbSingleton.getRedis();
 
     try {
-        logError('开始从 MySQL 加载数据到 Redis...');
+        logError('开始从 MongoDB 加载数据到 Redis...');
 
-        // 1. 获取所有数据
-        const [rows] = await mysqlPool.query('SELECT * FROM token_pools');
+        // 获取所有数据
+        const rows = await db.collection('token_pools').find({}).toArray();
 
-        // 2. 使用 multi 进行批量写入
+        // 使用 multi 进行批量写入
         const multi = redis.multi();
         rows.forEach(row => {
             multi.set(
                 `pool:${row.token_address}`,
                 JSON.stringify({
-                    pools: JSON.parse(row.pools),
+                    pools: row.pools,
                     createdAt: row.created_at,
                     updatedAt: row.updated_at
                 }),
@@ -68,11 +52,10 @@ async function loadAllToRedis() {
             );
         });
 
-        // 执行批量操作
         await multi.exec();
         logError(`成功加载 ${rows.length} 条数据到 Redis`);
     } catch (error) {
-        logError(`从 MySQL 加载数据到 Redis 失败: ${error.message}`);
+        logError(`从 MongoDB 加载数据到 Redis 失败: ${error.message}`);
         throw error;
     }
 }
@@ -93,7 +76,7 @@ async function filterPools() {
                 const isOrcaWp = pool.dexId === 'orca' && pool.labels?.includes('wp');
                 const hasSufficientLiquidity = pool.liquidity?.usd > 1000;
                 return (isPumpswap || isRaydiumV4 || isMeteoraDLMM || isOrcaWp) && hasSufficientLiquidity;
-            });
+            }).slice(0, 100); // 限制最多 100 个 pool
 
             const poolTypes = new Set();
             filteredPools.forEach((pool) => {
@@ -123,10 +106,10 @@ async function filterPools() {
 }
 
 /**
- * 将数据存储到 MySQL 和 Redis
+ * 将数据存储到 MongoDB 和 Redis
  */
 async function storeToDatabase(result) {
-    const mysqlPool = await dbSingleton.getMySQL();
+    const db = await dbSingleton.getMongoDb();
     const redis = await dbSingleton.getRedis();
     const timestamp = Date.now();
 
@@ -134,44 +117,49 @@ async function storeToDatabase(result) {
         const multi = redis.multi();
 
         for (const [tokenAddress, pools] of Object.entries(result)) {
-            // 检查是否已存在
-            const [rows] = await mysqlPool.query(
-                'SELECT created_at FROM token_pools WHERE token_address = ?',
-                [tokenAddress]
+            logError(`处理 tokenAddress: ${tokenAddress}, 长度: ${tokenAddress.length}, pools 数量: ${pools.length}`);
+
+            // 检查 tokenAddress 长度
+            if (tokenAddress.length > 100) {
+                logError(`警告: tokenAddress 过长 (${tokenAddress.length} 字符)，将截断到 100 字符`);
+                tokenAddress = tokenAddress.substring(0, 100);
+            }
+
+            // 限制 pools 数量
+            if (pools.length > 100) {
+                logError(`警告: pools 数量过多 (${pools.length})，仅保留前 100 条`);
+                pools = pools.slice(0, 100);
+            }
+
+            // 存储到 MongoDB
+            await db.collection('token_pools').updateOne(
+                { token_address: tokenAddress },
+                {
+                    $set: {
+                        pools,
+                        updated_at: timestamp
+                    },
+                    $setOnInsert: {
+                        created_at: timestamp
+                    }
+                },
+                { upsert: true }
             );
 
-            const createdAt = rows.length > 0 ? rows[0].created_at : timestamp;
-
-            // 更新 MySQL
-            await mysqlPool.query(
-                'INSERT INTO token_pools (token_address, pools, created_at, updated_at) ' +
-                'VALUES (?, ?, ?, ?) ' +
-                'ON DUPLICATE KEY UPDATE pools = ?, updated_at = ?',
-                [
-                    tokenAddress,
-                    JSON.stringify(pools),
-                    createdAt,
-                    timestamp,
-                    JSON.stringify(pools),
-                    timestamp
-                ]
-            );
-
-            // 添加到 Redis multi
+            // 添加到 Redis
             multi.set(
                 `pool:${tokenAddress}`,
                 JSON.stringify({
                     pools,
-                    createdAt,
+                    createdAt: timestamp,
                     updatedAt: timestamp
                 }),
-                { EX: 3600 * 24 } // 缓存24小时
+                { EX: 3600 * 24 }
             );
         }
 
-        // 执行批量操作
         await multi.exec();
-        logError(`成功存储 ${Object.keys(result).length} 条数据到数据库和缓存`);
+        logError(`成功存储 ${Object.keys(result).length} 条数据到 MongoDB 和 Redis`);
     } catch (error) {
         logError(`存储到数据库时出错: ${error.message}`);
         throw error;
@@ -200,12 +188,12 @@ async function main() {
         // 1. 初始化数据库连接
         await dbSingleton.initialize();
 
-        // 2. 初始化数据库和表结构
+        // 2. 初始化数据库
         await initDatabase();
 
-        // 3. 如果 Redis 缓存为空，从 MySQL 加载数据
+        // 3. 如果 Redis 缓存为空，从 MongoDB 加载数据
         if (await dbSingleton.isCacheEmpty()) {
-            logError('检测到 Redis 缓存为空，开始从 MySQL 加载数据...');
+            logError('检测到 Redis 缓存为空，开始从 MongoDB 加载数据...');
             await loadAllToRedis();
         } else {
             logError('Redis 缓存已有数据，跳过初始化加载');
