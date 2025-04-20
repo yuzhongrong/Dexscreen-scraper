@@ -10,7 +10,7 @@ import struct
 from decimal import Decimal, ROUND_DOWN
 import re
 import requests
-import telebot  # 添加 telebot 导入以修复 tg_send
+import telebot
 
 # Apply nest_asyncio
 nest_asyncio.apply()
@@ -51,7 +51,7 @@ class DexBot:
     def format_token_data(self):
         """
         Fetch information about specific tokens from the Dexscreener API.
-        Filter pairs with pairType AMM or DLMM.
+        Return all pairs without filtering.
 
         Returns:
             str: JSON string containing data for each token address.
@@ -62,27 +62,19 @@ class DexBot:
 
         for address in token_addresses[:self.max_token]:
             try:
-                response = requests.get(f"{base_url}{address}", timeout=10)
+                response = requests.get(f"{base_url}{address}", timeout=15)
                 if response.status_code == 200:
                     data = response.json()
                     pairs = data.get('pairs', [])
                     if pairs:
-                        # 筛选 pairType 为 AMM 或 DLMM 的交易对
-                        filtered_pairs = [
-                            pair for pair in pairs
-                            if pair.get('labels') in ["AMM", "DLMM"]
-                        ]
-                        if filtered_pairs:
-                            results[address] = filtered_pairs
-                        else:
-                            results[address] = [{"pairAddress": address, "Error": "No AMM or DLMM pairs found"}]
+                        results[address] = pairs  # 保留所有交易对
                     else:
-                        results[address] = [{"pairAddress": address, "Error": "No data retrieved"}]
+                        results[address] = [{"pairAddress": address, "Error": "No pairs found"}]
                 else:
                     results[address] = [{"pairAddress": address, "Error": f"Status code {response.status_code}"}]
             except requests.RequestException as e:
                 results[address] = [{"pairAddress": address, "Error": f"Request error: {str(e)}"}]
-            time.sleep(0.5)  # API 调用间隔
+            time.sleep(1)  # 避免速率限制
 
         return json.dumps({"data": results}, indent=2)
 
