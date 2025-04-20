@@ -203,7 +203,7 @@ async function main() {
         await runScheduledTask();
 
         // 5. 设置定时任务（每5分钟执行一次）
-        setInterval(runScheduledTask, 5 * 60 * 1000);
+        setInterval(runScheduledTask, 2 * 60 * 1000);
 
         // 6. 优雅关闭处理
         process.on('SIGINT', async () => {
