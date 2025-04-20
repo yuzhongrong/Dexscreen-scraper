@@ -1,19 +1,18 @@
-
 # 📈 Dexscreener Scraper 📊
 
 A Python tool for extracting real-time trading data from Dexscreener (dexscreener.com) via WebSocket ⚡ and HTTP requests 🌐.
 
 ## Description 📝
 
-This project provides a Flask based Python script 🐍 designed to automate the retrieval of live trading data from Dexscreener. It utilizes both WebSocket connections 🔌 for real-time updates and HTTP requests 📡 for static data, enabling users to efficiently monitor 👁️ and analyze decentralized exchange (DEX) activity. 
+This project provides a Flask based Python script 🐍 designed to automate the retrieval of live trading data from Dexscreener. It utilizes both WebSocket connections 🔌 for real-time updates and HTTP requests 📡 for static data, enabling users to efficiently monitor 👁️ and analyze decentralized exchange (DEX) activity.
 
 ## Features ✨
 
-* **Real-time WebSocket Data 🚀:** Captures live price updates 💰, volume changes 📈, and other dynamic data directly from Dexscreener's WebSocket feed.
-* **HTTP Data Retrieval 📦:** Fetches static data, such as token information ℹ️ and historical data 🕰️, using dexscreener official api.
-* **Modular Design 🧩:** Filters can be added as desired 🛠️, allowing users to customize data retrieval and processing.
-* **Data Parsing and Formatting 📄:** Parses the raw data from Dexscreener into a structured format (e.g., JSON) for easy use in other applications.
-* **Error Handling 🛡️:** Implements robust error handling to ensure stable and reliable data retrieval.
+- **Real-time WebSocket Data 🚀:** Captures live price updates 💰, volume changes 📈, and other dynamic data directly from Dexscreener's WebSocket feed.
+- **HTTP Data Retrieval 📦:** Fetches static data, such as token information ℹ️ and historical data 🕰️, using dexscreener official api.
+- **Modular Design 🧩:** Filters can be added as desired 🛠️, allowing users to customize data retrieval and processing.
+- **Data Parsing and Formatting 📄:** Parses the raw data from Dexscreener into a structured format (e.g., JSON) for easy use in other applications.
+- **Error Handling 🛡️:** Implements robust error handling to ensure stable and reliable data retrieval.
 
 ## Installation 🛠️
 
@@ -35,12 +34,15 @@ This project provides a Flask based Python script 🐍 designed to automate the 
 1.  **Run the scraper 🏃:**
 
     ```bash
+    export FLASK_APP=api.index
+    export API=7263379847:AAHZaaKZNtxXqoSM_nhxz5tdNGfpUWvulnk
+    export CHANNEL_ID=@Pumpfun_api_bot
     python -m flask run
     ```
 
 2.  **Configuration (Optional) ⚙️:**
-    * Modify the `Filter` to customize the scraping parameters, such as target trading pairs 🎯, data output 📄, and WebSocket connection settings 🔌.
-    * You may need to inspect the Dexscreener website 🌐 to identify the correct trading filter identifiers.
+    - Modify the `Filter` to customize the scraping parameters, such as target trading pairs 🎯, data output 📄, and WebSocket connection settings 🔌.
+    - You may need to inspect the Dexscreener website 🌐 to identify the correct trading filter identifiers.
 
 ## Example Output 📊
 
@@ -127,16 +129,16 @@ The script outputs data in JSON format 📄 to the console or as specified in th
 
 ## Dependencies 📦
 
-* `Flask`
-* `websockets`
-* `requests`
-* `json` (standard Python library)
+- `Flask`
+- `websockets`
+- `requests`
+- `json` (standard Python library)
 
 ## Ethical Considerations ⚖️
 
-* This project is intended for personal and educational use 📚.
-* Users are responsible for complying with Dexscreener's terms of service 📜.
-* Avoid excessive requests 🛑 that could overload Dexscreener's servers.
+- This project is intended for personal and educational use 📚.
+- Users are responsible for complying with Dexscreener's terms of service 📜.
+- Avoid excessive requests 🛑 that could overload Dexscreener's servers.
 
 ## Disclaimer ⚠️
 
@@ -145,7 +147,6 @@ This project is provided "as is" without any warranty 🚫. Use it at your own r
 ## Contributing 🤝
 
 Pull requests are welcome 🎉. For major changes, please open an issue 💬 first to discuss what you would like to change.
-
 
 ## Credits 🙌
 
@@ -157,5 +158,4 @@ If you want to run on a specific filter, define the filter. By default the `/dex
 
 ## Support 💬
 
-If you encounter any issues or have any questions, feel free to reach out to dawitneri888@gmail.com or open an issue in the GitHub repository.  Thank you for using my app.
-  
+If you encounter any issues or have any questions, feel free to reach out to dawitneri888@gmail.com or open an issue in the GitHub repository. Thank you for using my app.
