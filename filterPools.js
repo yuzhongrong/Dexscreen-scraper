@@ -119,7 +119,7 @@ async function main() {
     // 立即运行一次定时任务
     await runScheduledTask();
     // 每 2 分钟运行一次
-    setInterval(runScheduledTask, 2 * 60 * 1000);
+    // setInterval(runScheduledTask, 2 * 60 * 1000);
   } catch (error) {
     console.error('主程序启动失败:', error.message);
     logError(`主程序启动失败: ${error.message}`);
