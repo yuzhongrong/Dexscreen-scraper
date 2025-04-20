@@ -1,4 +1,5 @@
 const axios = require('axios'); // 使用 axios 进行 HTTP 请求
+const fs = require('fs').promises; // 使用 fs.promises 进行异步文件操作
 
 // 过滤池子的函数
 async function filterPools() {
@@ -39,8 +40,10 @@ async function filterPools() {
       Object.entries(filteredData).filter(([_, pools]) => pools.length > 0)
     );
 
-    // 输出结果
+    // 输出结果到控制台
     console.log(JSON.stringify(result, null, 2));
+
+    // 返回结果以供后续处理
     return result;
   } catch (error) {
     console.error('Error fetching or processing data:', error.message);
@@ -52,7 +55,16 @@ async function filterPools() {
   }
 }
 
-// 执行过滤
+// 执行过滤并将结果写入 pool.json
 filterPools()
-  .then(() => console.log('Filtering completed'))
+  .then(async (result) => {
+    try {
+      // 将结果写入 pool.json 文件
+      await fs.writeFile('pool.json', JSON.stringify(result, null, 2));
+      console.log('Filtering completed. Results written to pool.json');
+    } catch (fileError) {
+      console.error('Error writing to pool.json:', fileError.message);
+      throw fileError;
+    }
+  })
   .catch((err) => console.error('Filtering failed:', err));
