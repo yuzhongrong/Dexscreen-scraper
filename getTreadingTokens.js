@@ -59,20 +59,9 @@ async function filterPools() {
 filterPools()
   .then(async (result) => {
     try {
-      // 检查 pool.json 是否存在
-      const fileExists = await fs.access('pool.json')
-        .then(() => true)
-        .catch(() => false);
-
+    
       // 写入文件（覆盖模式）
       await fs.writeFile('pool.json', JSON.stringify(result, null, 2));
-
-      // 如果文件是新建的，设置读写权限 (rw-rw-r--)
-      if (!fileExists) {
-        await fs.chmod('pool.json', 0o664);
-        console.log('Created pool.json with read/write permissions (664)');
-      }
-
       console.log('Filtering completed. Results written to pool.json');
     } catch (fileError) {
       console.error('Error writing to pool.json:', fileError.message);
