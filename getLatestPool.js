@@ -1,7 +1,7 @@
-
 const dbSingleton = require('./dbSingleton');
-const fs = require('fs').promises; // 使用 promises API
-const fsSync = require('fs'); // 用于 logError 的同步写入
+const fs = require('fs').promises;
+const fsSync = require('fs');
+const util = require('util'); // 用于深层对象打印
 
 // 日志记录函数
 function logError(message) {
@@ -25,7 +25,7 @@ async function getLatestPool(sortBy = 'createdAt') {
             return {};
         }
 
-        // 批量获取键值
+        // 查找最新数据
         let latestData = null;
         let maxSortValue = -Infinity;
 
@@ -53,8 +53,12 @@ async function getLatestPool(sortBy = 'createdAt') {
             return {};
         }
 
-        // 写入 test.json
+        // 写入 test.json（完整序列化嵌套对象）
         await fs.writeFile('test.json', JSON.stringify(latestData, null, 2), 'utf8');
+
+        // 优化控制台输出，使用 util.inspect 显示深层对象
+        console.log('最新池子:', util.inspect(latestData, { showHidden: false, depth: null, colors: true }));
+
         const msg = `获取最新 1 条记录，按 ${sortBy} 排序，写入 test.json`;
         console.log(msg);
         logError(msg);
@@ -75,7 +79,6 @@ async function main() {
 
         // 获取最新数据
         const latestPool = await getLatestPool('createdAt');
-        console.log('最新池子:', latestPool);
 
         await dbSingleton.close();
     } catch (error) {
