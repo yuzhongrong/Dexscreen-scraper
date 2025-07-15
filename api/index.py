@@ -27,7 +27,8 @@ def dex():
         # Format the response JSON nicely for display
         mes_json = json.dumps(json.loads(mes), indent=4)
 
-        return render_template("dex.html", mes=mes_json)
+        # return render_template("dex.html", mes=mes_json)
+        return mes_json
             
     except Exception as e:
         print(e)
